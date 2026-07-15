@@ -1,0 +1,897 @@
+// This is your Prisma schema file for Fluxio
+// Learn more: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// ENUMS
+// ============================================
+
+enum UserRole {
+  SUPER_ADMIN
+  RESTAURANT_OWNER
+  MANAGER
+  CASHIER
+  CHEF
+  WAITER
+  CUSTOMER
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  PREPARING
+  READY
+  DELIVERED
+  CANCELLED
+  RETURNED
+}
+
+enum OrderType {
+  DINE_IN
+  TAKEAWAY
+  DELIVERY
+}
+
+enum PaymentMethod {
+  CASH
+  CARD
+  WALLET
+  ONLINE
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  PARTIAL
+  REFUNDED
+  FAILED
+}
+
+enum SubscriptionPlan {
+  STARTER
+  BUSINESS
+  ENTERPRISE
+}
+
+enum SubscriptionStatus {
+  TRIAL
+  ACTIVE
+  PAST_DUE
+  CANCELLED
+  EXPIRED
+  SUSPENDED
+}
+
+enum InventoryMovementType {
+  IN
+  OUT
+  ADJUSTMENT
+  WASTE
+  RETURN
+}
+
+enum ReservationStatus {
+  PENDING
+  CONFIRMED
+  SEATED
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+enum CampaignType {
+  OFFER
+  COUPON
+  FLASH_DEAL
+  SEASONAL
+  LOYALTY
+  REFERRAL
+}
+
+enum NotificationChannel {
+  PUSH
+  EMAIL
+  SMS
+  WHATSAPP
+}
+
+// ============================================
+// CORE: TENANT & SUBSCRIPTION
+// ============================================
+
+model Tenant {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  email       String
+  phone       String?
+  address     String?
+  logoUrl     String?
+  faviconUrl  String?
+  primaryColor String? @default("#00d4ff")
+  secondaryColor String? @default("#7b2ff7")
+  accentColor String? @default("#00f5d4")
+  isActive    Boolean  @default(true)
+  isDeleted   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Subscription
+  subscription   Subscription? @relation(fields: [subscriptionId], references: [id])
+  subscriptionId String?
+
+  // Relations
+  branches     Branch[]
+  users        User[]
+  categories   Category[]
+  products     Product[]
+  orders       Order[]
+  tables       Table[]
+  reservations Reservation[]
+  inventoryItems InventoryItem[]
+  suppliers    Supplier[]
+  campaigns    Campaign[]
+  reviews      Review[]
+  auditLogs    AuditLog[]
+  settings     RestaurantSetting?
+
+  @@index([slug])
+  @@index([isActive])
+  @@index([isDeleted])
+}
+
+model Subscription {
+  id          String   @id @default(cuid())
+  tenantId    String   @unique
+  plan        SubscriptionPlan @default(STARTER)
+  status      SubscriptionStatus @default(TRIAL)
+
+  // Plan Limits
+  maxBranches Int      @default(1)
+  maxEmployees Int    @default(10)
+  maxProducts Int?     // null = unlimited
+  maxOrders   Int?     // null = unlimited
+
+  // Billing
+  priceMonthly   Decimal  @default(999.00)
+  priceYearly    Decimal  @default(9990.00)
+  currency       String   @default("EGP")
+
+  // Dates
+  trialEndsAt    DateTime?
+  currentPeriodStart DateTime @default(now())
+  currentPeriodEnd   DateTime?
+  cancelledAt    DateTime?
+
+  // Stripe
+  stripeCustomerId     String?
+  stripeSubscriptionId String?
+  stripePriceId        String?
+
+  isDeleted   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  tenant      Tenant?
+  invoices    Invoice[]
+  coupons     SubscriptionCoupon[]
+
+  @@index([tenantId])
+  @@index([status])
+  @@index([stripeCustomerId])
+}
+
+model Invoice {
+  id              String   @id @default(cuid())
+  subscriptionId  String
+  amount          Decimal
+  currency        String   @default("EGP")
+  status          String   // paid, pending, failed
+  stripeInvoiceId String?
+  paidAt          DateTime?
+  dueDate         DateTime?
+  pdfUrl          String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  subscription    Subscription @relation(fields: [subscriptionId], references: [id])
+
+  @@index([subscriptionId])
+}
+
+model SubscriptionCoupon {
+  id              String   @id @default(cuid())
+  subscriptionId  String
+  code            String
+  discountPercent Int?     // e.g., 20 for 20%
+  discountAmount  Decimal? // fixed amount
+  validFrom       DateTime @default(now())
+  validUntil      DateTime?
+  maxUses         Int?
+  usedCount       Int      @default(0)
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+
+  subscription    Subscription @relation(fields: [subscriptionId], references: [id])
+
+  @@index([subscriptionId])
+  @@index([code])
+}
+
+// ============================================
+// CORE: USERS & RBAC
+// ============================================
+
+model User {
+  id          String   @id @default(cuid())
+  tenantId    String
+  email       String
+  username    String   @unique
+  password    String   // hashed with bcrypt
+  firstName   String?
+  lastName    String?
+  phone       String?
+  avatarUrl   String?
+  role        UserRole @default(CUSTOMER)
+
+  // For customers
+  isVerified  Boolean  @default(false)
+
+  // Custom permissions override (JSON array of permission strings)
+  customPermissions Json?
+
+  isActive    Boolean  @default(true)
+  isDeleted   Boolean  @default(false)
+  lastLoginAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  sessions    Session[]
+  orders      Order[]     @relation("CreatedBy")
+  reservations Reservation[]
+  reviews     Review[]
+  auditLogs   AuditLog[]
+
+  // Waiter specific
+  waiterAssignments Order[] @relation("AssignedWaiter")
+
+  @@unique([tenantId, email])
+  @@index([tenantId])
+  @@index([role])
+  @@index([isActive])
+  @@index([isDeleted])
+}
+
+model Session {
+  id          String   @id @default(cuid())
+  userId      String
+  token       String   @unique
+  refreshToken String  @unique
+  ipAddress   String?
+  userAgent   String?
+  expiresAt   DateTime
+  refreshExpiresAt DateTime
+  createdAt   DateTime @default(now())
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([token])
+  @@index([refreshToken])
+}
+
+// ============================================
+// RESTAURANT: Branches & Settings
+// ============================================
+
+model Branch {
+  id          String   @id @default(cuid())
+  tenantId    String
+  name        String
+  address     String?
+  phone       String?
+  email       String?
+
+  // Business Hours (JSON: {monday: {open: "09:00", close: "23:00", closed: false}, ...})
+  businessHours Json?
+
+  // Location
+  latitude    Decimal?
+  longitude   Decimal?
+
+  isActive    Boolean  @default(true)
+  isDeleted   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  tables      Table[]
+  orders      Order[]
+  inventoryItems InventoryItem[]
+
+  @@index([tenantId])
+  @@index([isActive])
+}
+
+model RestaurantSetting {
+  id              String   @id @default(cuid())
+  tenantId        String   @unique
+
+  // Branding
+  brandName       String?
+  brandLogoUrl    String?
+  brandColors     Json?    // {primary: "#00d4ff", secondary: "#7b2ff7", ...}
+
+  // Business
+  taxRate         Decimal  @default(14.00) // Egypt default VAT
+  taxNumber       String?
+  currency        String   @default("EGP")
+
+  // Features
+  enableTips      Boolean  @default(true)
+  enableDelivery  Boolean  @default(false)
+  enableReservations Boolean @default(true)
+
+  // Receipt
+  receiptHeader   String?
+  receiptFooter   String?
+  receiptShowTax  Boolean  @default(true)
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  tenant          Tenant   @relation(fields: [tenantId], references: [id])
+}
+
+// ============================================
+// MENU: Categories, Products, Variants, Extras
+// ============================================
+
+model Category {
+  id          String   @id @default(cuid())
+  tenantId    String
+  name        String
+  nameAr      String?  // Arabic name
+  description String?
+  imageUrl    String?
+  sortOrder   Int      @default(0)
+  isActive    Boolean  @default(true)
+  isDeleted   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  products    Product[]
+
+  @@index([tenantId])
+  @@index([isActive])
+}
+
+model Product {
+  id          String   @id @default(cuid())
+  tenantId    String
+  categoryId  String?
+  name        String
+  nameAr      String?
+  description String?
+  imageUrl    String?
+  basePrice   Decimal
+  costPrice   Decimal? // for profit calculations
+  sku         String?
+
+  // Flags
+  isAvailable Boolean  @default(true)
+  isFeatured  Boolean  @default(false)
+  isDeleted   Boolean  @default(false)
+
+  // Inventory link
+  inventoryItemId String?
+
+  // Track stock if linked to inventory
+  trackStock  Boolean  @default(false)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  category    Category? @relation(fields: [categoryId], references: [id])
+  variants    ProductVariant[]
+  extras      ProductExtra[]
+  orderItems  OrderItem[]
+  inventoryItem InventoryItem? @relation(fields: [inventoryItemId], references: [id])
+
+  @@index([tenantId])
+  @@index([categoryId])
+  @@index([isAvailable])
+}
+
+model ProductVariant {
+  id          String   @id @default(cuid())
+  productId   String
+  name        String   // e.g., "Large", "Medium"
+  nameAr      String?
+  priceAdjustment Decimal @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+}
+
+model ProductExtra {
+  id          String   @id @default(cuid())
+  productId   String
+  name        String   // e.g., "Extra Cheese", "Spicy"
+  nameAr      String?
+  price       Decimal
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+}
+
+// ============================================
+// ORDERS: Lifecycle & State Machine
+// ============================================
+
+model Order {
+  id          String   @id @default(cuid())
+  tenantId    String
+  branchId    String?
+
+  // Order Info
+  orderNumber String   @unique // e.g., "ORD-000001"
+  type        OrderType @default(DINE_IN)
+  status      OrderStatus @default(PENDING)
+
+  // Customer
+  customerId  String?
+  customerName String?
+  customerPhone String?
+  customerEmail String?
+
+  // Table (for dine-in)
+  tableId     String?
+
+  // Waiter
+  waiterId    String?
+  createdById String
+
+  // Financial
+  subtotal    Decimal  @default(0)
+  taxAmount   Decimal  @default(0)
+  discountAmount Decimal @default(0)
+  totalAmount Decimal  @default(0)
+
+  // Notes
+  customerNote String?
+  internalNote String?
+
+  // Timestamps
+  confirmedAt DateTime?
+  preparingAt DateTime?
+  readyAt     DateTime?
+  deliveredAt DateTime?
+  cancelledAt DateTime?
+  cancelledBy String?
+  cancelReason String?
+
+  isDeleted   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  branch      Branch?  @relation(fields: [branchId], references: [id])
+  customer    User?    @relation(fields: [customerId], references: [id])
+  table       Table?   @relation(fields: [tableId], references: [id])
+  waiter      User?    @relation("AssignedWaiter", fields: [waiterId], references: [id])
+  createdBy   User     @relation("CreatedBy", fields: [createdById], references: [id])
+  items       OrderItem[]
+  payments    Payment[]
+  auditLogs   AuditLog[]
+
+  @@index([tenantId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([orderNumber])
+}
+
+model OrderItem {
+  id          String   @id @default(cuid())
+  orderId     String
+  productId   String
+  variantId   String?
+
+  name        String   // snapshot at order time
+  quantity    Int      @default(1)
+  unitPrice   Decimal
+  totalPrice  Decimal
+
+  // Extras (JSON array of {name, price})
+  extras      Json?
+
+  notes       String?
+  createdAt   DateTime @default(now())
+
+  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product     Product  @relation(fields: [productId], references: [id])
+
+  @@index([orderId])
+  @@index([productId])
+}
+
+// ============================================
+// PAYMENTS
+// ============================================
+
+model Payment {
+  id          String   @id @default(cuid())
+  orderId     String
+  method      PaymentMethod
+  status      PaymentStatus @default(PENDING)
+  amount      Decimal
+  tipAmount   Decimal  @default(0)
+
+  // Split payment
+  isSplit     Boolean  @default(false)
+  splitIndex  Int?     // 1, 2, 3 for split payments
+
+  // Reference
+  reference   String?  // transaction ID from gateway
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([status])
+}
+
+// ============================================
+// TABLES & RESERVATIONS
+// ============================================
+
+model Table {
+  id          String   @id @default(cuid())
+  tenantId    String
+  branchId    String?
+  number      String   // e.g., "T01", "A-5"
+  capacity    Int      @default(4)
+
+  // Layout position (for visual floor plan)
+  posX        Int      @default(0)
+  posY        Int      @default(0)
+  shape       String   @default("rectangle") // rectangle, circle, square
+
+  status      String   @default("available") // available, occupied, reserved, cleaning
+  isActive    Boolean  @default(true)
+  isDeleted   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  branch      Branch?  @relation(fields: [branchId], references: [id])
+  orders      Order[]
+  reservations Reservation[]
+
+  @@unique([tenantId, number])
+  @@index([tenantId])
+  @@index([status])
+}
+
+model Reservation {
+  id          String   @id @default(cuid())
+  tenantId    String
+  tableId     String?
+  customerId  String?
+
+  customerName  String
+  customerPhone String
+  customerEmail String?
+  partySize   Int
+
+  date        DateTime
+  time        String   // "19:30"
+  status      ReservationStatus @default(PENDING)
+  notes       String?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  table       Table?   @relation(fields: [tableId], references: [id])
+  customer    User?    @relation(fields: [customerId], references: [id])
+
+  @@index([tenantId])
+  @@index([date])
+  @@index([status])
+}
+
+// ============================================
+// INVENTORY
+// ============================================
+
+model InventoryItem {
+  id          String   @id @default(cuid())
+  tenantId    String
+  branchId    String?
+
+  name        String
+  nameAr      String?
+  sku         String?
+  description String?
+
+  // Units
+  unitOfMeasure String @default("piece") // kg, liter, piece, box, etc.
+
+  // Stock
+  currentStock Decimal @default(0)
+  minStockLevel Decimal @default(0)
+  maxStockLevel Decimal?
+  reorderPoint  Decimal?
+
+  // Cost
+  unitCost    Decimal?
+
+  // Supplier
+  supplierId  String?
+
+  isActive    Boolean  @default(true)
+  isDeleted   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  branch      Branch?  @relation(fields: [branchId], references: [id])
+  supplier    Supplier? @relation(fields: [supplierId], references: [id])
+  products    Product[]
+  movements   InventoryMovement[]
+
+  @@index([tenantId])
+  @@index([supplierId])
+  @@index([currentStock])
+}
+
+model InventoryMovement {
+  id          String   @id @default(cuid())
+  itemId      String
+  type        InventoryMovementType
+  quantity    Decimal
+  unitCost    Decimal?
+  totalCost   Decimal?
+
+  // Reference
+  orderId     String?  // if linked to sale
+  reference   String?  // PO number, adjustment reason, etc.
+  notes       String?
+
+  createdBy   String   // userId
+  createdAt   DateTime @default(now())
+
+  item        InventoryItem @relation(fields: [itemId], references: [id])
+
+  @@index([itemId])
+  @@index([createdAt])
+}
+
+model Supplier {
+  id          String   @id @default(cuid())
+  tenantId    String
+  name        String
+  contactName String?
+  phone       String?
+  email       String?
+  address     String?
+  isActive    Boolean  @default(true)
+  isDeleted   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  items       InventoryItem[]
+
+  @@index([tenantId])
+}
+
+// ============================================
+// MARKETING: Campaigns, Coupons, Loyalty
+// ============================================
+
+model Campaign {
+  id          String   @id @default(cuid())
+  tenantId    String
+  name        String
+  type        CampaignType
+
+  // Discount
+  discountPercent Int?
+  discountAmount  Decimal?
+  maxDiscount     Decimal?
+
+  // Conditions
+  minOrderAmount  Decimal?
+  applicableCategories String[] // category IDs
+  applicableProducts   String[] // product IDs
+
+  // Schedule
+  startDate   DateTime
+  endDate     DateTime?
+
+  // Usage
+  maxUses     Int?
+  usedCount   Int      @default(0)
+  maxUsesPerCustomer Int? @default(1)
+
+  // Display
+  bannerUrl   String?
+  bannerText  String?
+  isActive    Boolean  @default(true)
+  isDeleted   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId])
+  @@index([type])
+  @@index([isActive])
+}
+
+model LoyaltyProgram {
+  id          String   @id @default(cuid())
+  tenantId    String
+  customerId  String
+  points      Int      @default(0)
+  lifetimePoints Int   @default(0)
+  tier        String   @default("bronze") // bronze, silver, gold, platinum
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([tenantId, customerId])
+  @@index([tenantId])
+}
+
+model LoyaltyTransaction {
+  id          String   @id @default(cuid())
+  programId   String
+  points      Int      // positive = earned, negative = redeemed
+  type        String   // earn, redeem, expire, bonus
+  orderId     String?
+  description String?
+  createdAt   DateTime @default(now())
+
+  @@index([programId])
+}
+
+// ============================================
+// REVIEWS
+// ============================================
+
+model Review {
+  id          String   @id @default(cuid())
+  tenantId    String
+  customerId  String
+  orderId     String?
+
+  rating      Int      // 1-5
+  comment     String?
+
+  // Moderation
+  isVisible   Boolean  @default(false)
+  moderatedBy String?
+  moderatedAt DateTime?
+
+  isDeleted   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  customer    User     @relation(fields: [customerId], references: [id])
+
+  @@index([tenantId])
+  @@index([rating])
+}
+
+// ============================================
+// AUDIT LOGS
+// ============================================
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  tenantId    String
+  userId      String?
+
+  action      String   // e.g., "order.created", "user.login", "payment.refunded"
+  entityType  String   // "Order", "User", "Payment", etc.
+  entityId    String?
+
+  // Before/After snapshots
+  before      Json?
+  after       Json?
+
+  // Context
+  ipAddress   String?
+  userAgent   String?
+
+  // For Super Admin impersonation
+  impersonatedBy String?
+
+  createdAt   DateTime @default(now())
+
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  user        User?    @relation(fields: [userId], references: [id])
+
+  @@index([tenantId])
+  @@index([action])
+  @@index([entityType, entityId])
+  @@index([createdAt])
+}
+
+// ============================================
+// NOTIFICATIONS
+// ============================================
+
+model Notification {
+  id          String   @id @default(cuid())
+  tenantId    String?
+  userId      String?
+
+  title       String
+  body        String
+  channel     NotificationChannel @default(PUSH)
+
+  // Data
+  data        Json?    // {orderId, type, etc.}
+
+  // Status
+  isRead      Boolean  @default(false)
+  sentAt      DateTime?
+  readAt      DateTime?
+
+  createdAt   DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([userId])
+  @@index([isRead])
+}
+
+// ============================================
+// QR CODES
+// ============================================
+
+model QrCode {
+  id          String   @id @default(cuid())
+  tenantId    String
+  branchId    String?
+  tableId     String?
+
+  code        String   @unique // the actual QR code string/URL
+  url         String   // the full URL it redirects to
+
+  scanCount   Int      @default(0)
+  lastScannedAt DateTime?
+
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([tenantId])
+  @@index([code])
+}
