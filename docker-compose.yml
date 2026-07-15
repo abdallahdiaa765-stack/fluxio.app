@@ -1,0 +1,54 @@
+version: "3.8"
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: fluxio-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: fluxio
+      POSTGRES_PASSWORD: fluxio_dev_password
+      POSTGRES_DB: fluxio
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fluxio -d fluxio"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: fluxio-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Optional: MinIO for file storage (product images, receipts)
+  minio:
+    image: minio/minio:latest
+    container_name: fluxio-minio
+    restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER: fluxio
+      MINIO_ROOT_PASSWORD: fluxio_minio_password
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    command: server /data --console-address ":9001"
+
+volumes:
+  postgres_data:
+  redis_data:
+  minio_data:
