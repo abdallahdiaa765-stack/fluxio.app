@@ -1,0 +1,1 @@
+NOTE: apps/api/src/websocket/kitchen.gateway.ts was DELETED - it's replaced by pusher.service.ts + pusher-auth.controller.ts
