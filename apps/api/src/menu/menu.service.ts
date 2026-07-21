@@ -1,5 +1,6 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '@/common/prisma.service';
+import { SubscriptionStatus } from '@fluxio/database';
 
 @Injectable()
 export class MenuService {
@@ -240,9 +241,15 @@ export class MenuService {
 
   // ========== PUBLIC MENU ==========
   async getPublicMenu(tenantSlug: string) {
+    // Note: no `isActive: true` filter in the `where` here anymore - a tenant
+    // that's inactive purely due to subscription lifecycle (as opposed to a
+    // manual super-admin suspension) still needs to be found so we can tell
+    // the customer *why* the menu is down, instead of returning a generic
+    // "Restaurant not found" 404 for both cases.
     const tenant = await this.prisma.tenant.findUnique({
-      where: { slug: tenantSlug, isActive: true, isDeleted: false },
+      where: { slug: tenantSlug, isDeleted: false },
       include: {
+        subscription: true,
         settings: true,
         categories: {
           where: { isActive: true, isDeleted: false },
@@ -261,6 +268,17 @@ export class MenuService {
     });
 
     if (!tenant) throw new NotFoundException('Restaurant not found');
+
+    const subStatus = tenant.subscription?.status;
+    const subscriptionInactive =
+      subStatus === SubscriptionStatus.EXPIRED || subStatus === SubscriptionStatus.SUSPENDED;
+
+    if (!tenant.isActive || subscriptionInactive) {
+      throw new ForbiddenException({
+        code: 'SUBSCRIPTION_INACTIVE',
+        message: 'This restaurant is temporarily unavailable.',
+      });
+    }
 
     return {
       tenant: {

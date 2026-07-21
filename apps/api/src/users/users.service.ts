@@ -2,6 +2,7 @@ import { Injectable, BadRequestException, NotFoundException } from '@nestjs/comm
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '@/common/prisma.service';
 import { UserRole } from '@fluxio/database';
+import { FeatureFlag, planHasFeature } from '@/subscriptions/feature-flags';
 
 @Injectable()
 export class UsersService {
@@ -81,6 +82,15 @@ export class UsersService {
     if (subscription?.maxEmployees && currentEmployeeCount >= subscription.maxEmployees) {
       throw new BadRequestException(
         `Employee limit reached (${subscription.maxEmployees}). Upgrade your plan.`
+      );
+    }
+
+    // Custom per-employee permission overrides are a Business+ feature -
+    // Starter tenants can still assign roles, just not hand-pick individual
+    // permissions per person.
+    if (data.customPermissions?.length && subscription && !planHasFeature(subscription.plan, FeatureFlag.EMPLOYEE_PERMISSIONS)) {
+      throw new BadRequestException(
+        'Custom employee permissions require the Business plan or higher. Upgrade to unlock this.'
       );
     }
 

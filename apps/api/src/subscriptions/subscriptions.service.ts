@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '@/common/prisma.service';
 import { SubscriptionPlan, SubscriptionStatus } from '@fluxio/database';
+import { FeatureFlag, PLAN_FEATURE_FLAGS, planHasFeature } from './feature-flags';
 
 export const PLAN_CONFIGS = {
   [SubscriptionPlan.STARTER]: {
@@ -96,13 +97,29 @@ export class SubscriptionsService {
 
     const config = PLAN_CONFIGS[subscription.plan];
 
+    const daysUntilExpiry = subscription.currentPeriodEnd
+      ? Math.ceil((subscription.currentPeriodEnd.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+      : null;
+
     return {
       ...subscription,
       planConfig: config,
+      featureFlags: PLAN_FEATURE_FLAGS[subscription.plan],
       isTrial: subscription.status === SubscriptionStatus.TRIAL,
       trialDaysLeft: subscription.trialEndsAt
         ? Math.max(0, Math.ceil((subscription.trialEndsAt.getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
         : 0,
+      // Days left in the CURRENT paid period (independent of trial), used by
+      // the settings-page countdown. Null when there's no end date set yet.
+      daysUntilExpiry,
+      // Mirrors the 7-day threshold the daily cron job (SubscriptionsCronService)
+      // uses to send the "about to expire" notification, so the in-app banner
+      // shows up immediately rather than waiting for the next cron run.
+      isExpiringSoon:
+        subscription.status === SubscriptionStatus.ACTIVE &&
+        daysUntilExpiry !== null &&
+        daysUntilExpiry >= 0 &&
+        daysUntilExpiry <= 7,
     };
   }
 
@@ -175,11 +192,14 @@ export class SubscriptionsService {
         isActive: true,
         validFrom: { lte: new Date() },
         OR: [{ validUntil: null }, { validUntil: { gte: new Date() } }],
-        OR: [{ maxUses: null }, { usedCount: { lt: { maxUses } } }],
       },
     });
 
-    if (!coupon) {
+    // maxUses/usedCount is a field-to-field comparison, which Prisma's `where`
+    // can't express directly - checked here instead of in the query above
+    // (the previous version tried `usedCount: { lt: { maxUses } }`, which
+    // isn't valid Prisma syntax and threw a ReferenceError on every call).
+    if (!coupon || (coupon.maxUses !== null && coupon.usedCount >= coupon.maxUses)) {
       throw new BadRequestException('Invalid or expired coupon code');
     }
 
@@ -197,7 +217,7 @@ export class SubscriptionsService {
     };
   }
 
-  async checkFeatureAccess(tenantId: string, feature: string): Promise<boolean> {
+  async checkFeatureAccess(tenantId: string, feature: FeatureFlag): Promise<boolean> {
     const subscription = await this.prisma.subscription.findUnique({
       where: { tenantId },
     });
@@ -210,8 +230,7 @@ export class SubscriptionsService {
       return false;
     }
 
-    const config = PLAN_CONFIGS[subscription.plan];
-    return config.features.includes(feature);
+    return planHasFeature(subscription.plan, feature);
   }
 
   async enforceLimit(tenantId: string, limitType: 'branches' | 'employees' | 'products' | 'orders') {
@@ -263,10 +282,35 @@ export class SubscriptionsService {
     }
   }
 
+  async requestVodafoneCashRenewal(tenantId: string, plan: SubscriptionPlan, billingCycle: 'monthly' | 'yearly') {
+    const subscription = await this.prisma.subscription.findUnique({ where: { tenantId } });
+    if (!subscription) {
+      throw new NotFoundException('Subscription not found');
+    }
+
+    const config = PLAN_CONFIGS[plan];
+    const amount = billingCycle === 'yearly' ? config.priceYearly : config.priceMonthly;
+
+    // Recorded as `pending` - a human (super admin) confirms the Vodafone Cash
+    // transfer actually arrived and marks it paid; we never auto-activate a
+    // plan off an unverified manual payment claim.
+    return this.prisma.invoice.create({
+      data: {
+        subscriptionId: subscription.id,
+        amount,
+        currency: subscription.currency,
+        status: 'pending',
+        paymentMethod: 'vodafone_cash',
+        dueDate: new Date(),
+      },
+    });
+  }
+
   async getAllPlans() {
     return Object.entries(PLAN_CONFIGS).map(([key, config]) => ({
       plan: key,
       ...config,
+      featureFlags: PLAN_FEATURE_FLAGS[key as SubscriptionPlan],
     }));
   }
 }

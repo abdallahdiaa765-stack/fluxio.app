@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { Eye, EyeOff, Loader2, UtensilsCrossed } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -68,8 +69,15 @@ export default function LoginPage() {
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="text-center mb-8">
-          <div className="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-br from-[#00d4ff] via-[#7b2ff7] to-[#00d4ff] flex items-center justify-center text-2xl font-bold shadow-lg shadow-cyan-500/20 mb-4">
-            F
+          <div className="relative w-16 h-16 mx-auto rounded-2xl overflow-hidden shadow-lg shadow-cyan-500/20 mb-4">
+            <Image
+              src="/logo/fluxio-icon-color.png"
+              alt="Fluxio"
+              fill
+              sizes="64px"
+              className="object-cover"
+              priority
+            />
           </div>
           <h1 className="text-2xl font-bold text-white">Fluxio</h1>
           <p className="text-slate-400 mt-1">Run Your Restaurant Smarter</p>

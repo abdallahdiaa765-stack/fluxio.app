@@ -93,3 +93,12 @@
 .hover-glow {
   @apply transition-shadow duration-200 hover:shadow-lg hover:shadow-primary/10;
 }
+
+.no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}

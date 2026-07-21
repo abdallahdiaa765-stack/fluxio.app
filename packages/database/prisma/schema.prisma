@@ -172,6 +172,12 @@ model Subscription {
   currentPeriodEnd   DateTime?
   cancelledAt    DateTime?
 
+  // Lifecycle tracking - written only by SubscriptionsCronService / super-admin
+  // assignment, so the daily job never sends the same "expiring soon" warning
+  // twice, and we know exactly when a subscription was auto-expired.
+  expiryWarningSentAt DateTime?
+  expiredAt           DateTime?
+
   // Stripe
   stripeCustomerId     String?
   stripeSubscriptionId String?
@@ -197,6 +203,8 @@ model Invoice {
   amount          Decimal
   currency        String   @default("EGP")
   status          String   // paid, pending, failed
+  paymentMethod   String   @default("stripe") // stripe, vodafone_cash
+  reference       String?  // e.g. the number/txn note the owner paid from, for manual methods
   stripeInvoiceId String?
   paidAt          DateTime?
   dueDate         DateTime?

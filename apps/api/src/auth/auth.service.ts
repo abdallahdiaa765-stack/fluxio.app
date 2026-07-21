@@ -147,6 +147,56 @@ export class AuthService {
     };
   }
 
+  /**
+   * Separate login path for the super-admin control panel. Unlike the normal
+   * tenant login, this does NOT take a tenantSlug - it looks the user up by
+   * email directly and only succeeds if that account's role is SUPER_ADMIN.
+   * Kept as its own method (rather than branching inside login()) so the
+   * hidden admin panel never shares a code path with tenant-facing auth.
+   */
+  async adminLogin(email: string, password: string, meta?: { ip?: string; userAgent?: string }) {
+    const invalidCredentials = () => new UnauthorizedException('Invalid email or password');
+
+    const user = await this.prisma.user.findFirst({
+      where: { email, role: 'SUPER_ADMIN', isDeleted: false },
+    });
+
+    if (!user || !user.isActive) {
+      throw invalidCredentials();
+    }
+
+    const passwordMatches = await bcrypt.compare(password, user.password);
+    if (!passwordMatches) {
+      throw invalidCredentials();
+    }
+
+    const tokens = await this.issueTokens({
+      userId: user.id,
+      email: user.email,
+      tenantId: user.tenantId,
+      role: user.role,
+      ip: meta?.ip,
+      userAgent: meta?.userAgent,
+    });
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { lastLoginAt: new Date() },
+    });
+
+    return {
+      ...tokens,
+      user: {
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        role: user.role,
+        tenantId: user.tenantId,
+      },
+    };
+  }
+
   async refreshTokens(refreshToken: string) {
     let payload: RefreshTokenPayload;
     try {

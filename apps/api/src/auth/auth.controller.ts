@@ -3,6 +3,7 @@ import type { Request } from 'express';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { LoginDto } from './dto/login.dto';
+import { AdminLoginDto } from './dto/admin-login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { RefreshDto } from './dto/refresh.dto';
 
@@ -18,6 +19,18 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   async login(@Body() dto: LoginDto, @Req() req: Request) {
     return this.authService.login(dto.email, dto.password, dto.tenantSlug, {
+      ip: req.ip,
+      userAgent: req.headers['user-agent'],
+    });
+  }
+
+  // Dedicated login endpoint for the super-admin control panel. Deliberately
+  // does not accept tenantSlug and rejects anyone whose role isn't
+  // SUPER_ADMIN (see AuthService.adminLogin).
+  @Post('admin-login')
+  @HttpCode(HttpStatus.OK)
+  async adminLogin(@Body() dto: AdminLoginDto, @Req() req: Request) {
+    return this.authService.adminLogin(dto.email, dto.password, {
       ip: req.ip,
       userAgent: req.headers['user-agent'],
     });
