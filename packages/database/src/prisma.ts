@@ -23,10 +23,8 @@ export type TenantContext = {
 };
 
 // Middleware to set RLS context before each query
-prisma.$use(async (params, next) => {
-  // RLS will be enforced via PostgreSQL policies
-  // This middleware can be extended for audit logging
-  return next(params);
-});
+// NOTE: Prisma removed `$use` in v5+. RLS is enforced entirely via
+// PostgreSQL policies for now; if per-query audit logging is needed later,
+// use Prisma Client Extensions ($extends) instead of middleware.
 
 export default prisma;
