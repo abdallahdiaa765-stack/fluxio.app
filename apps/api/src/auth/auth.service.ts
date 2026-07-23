@@ -283,7 +283,7 @@ export class AuthService {
 
     const accessToken = await this.jwtService.signAsync(accessPayload, {
       secret: this.configService.get<string>('JWT_SECRET'),
-      expiresIn: accessExpiration,
+      expiresIn: accessExpiration as any,
     });
 
     // Pre-generate the session id so it can be embedded in the refresh JWT
@@ -300,7 +300,7 @@ export class AuthService {
 
     const refreshToken = await this.jwtService.signAsync(refreshPayload, {
       secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
-      expiresIn: refreshExpiration,
+      expiresIn: refreshExpiration as any,
     });
 
     await this.prisma.session.create({
