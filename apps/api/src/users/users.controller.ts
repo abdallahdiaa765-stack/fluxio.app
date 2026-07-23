@@ -13,7 +13,7 @@ import { UsersService } from './users.service';
 import { JwtAuthGuard } from '@/auth/guards/jwt-auth.guard';
 import { RequirePermissions } from '@/auth/guards/roles.guard';
 import { Permission } from '@/common/rbac.permissions';
-import { CurrentTenant, CurrentUser } from '@/common/decorators/current-user.decorator';
+import { CurrentTenant } from '@/common/decorators/current-user.decorator';
 import { UserRole } from '@fluxio/database';
 
 class CreateUserDto {
