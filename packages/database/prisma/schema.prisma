@@ -268,6 +268,7 @@ model User {
   tenant      Tenant   @relation(fields: [tenantId], references: [id])
   sessions    Session[]
   orders      Order[]     @relation("CreatedBy")
+  customerOrders Order[]  @relation("CustomerOrders")
   reservations Reservation[]
   reviews     Review[]
   auditLogs   AuditLog[]
@@ -505,13 +506,12 @@ model Order {
 
   tenant      Tenant   @relation(fields: [tenantId], references: [id])
   branch      Branch?  @relation(fields: [branchId], references: [id])
-  customer    User?    @relation(fields: [customerId], references: [id])
+  customer    User?    @relation("CustomerOrders", fields: [customerId], references: [id])
   table       Table?   @relation(fields: [tableId], references: [id])
   waiter      User?    @relation("AssignedWaiter", fields: [waiterId], references: [id])
   createdBy   User     @relation("CreatedBy", fields: [createdById], references: [id])
   items       OrderItem[]
   payments    Payment[]
-  auditLogs   AuditLog[]
 
   @@index([tenantId])
   @@index([status])
