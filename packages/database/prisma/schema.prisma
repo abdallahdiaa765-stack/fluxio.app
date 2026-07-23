@@ -127,8 +127,7 @@ model Tenant {
 
   // Subscription
   subscription   Subscription? @relation(fields: [subscriptionId], references: [id])
-  subscriptionId String?
-
+  subscriptionId String?  @unique
   // Relations
   branches     Branch[]
   users        User[]
