@@ -3,3 +3,4 @@ export type { TenantContext } from './prisma';
 
 // Re-export generated types for shared usage
 export * from './generated/prisma';
+export { PrismaClient } from './generated/prisma';
