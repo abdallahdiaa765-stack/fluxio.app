@@ -1,6 +1,14 @@
 import { Injectable, CanActivate, ExecutionContext, ForbiddenException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { Permission, ROLE_PERMISSIONS } from '../rbac.permissions';
+
+export type Permission = string;
+export const ROLE_PERMISSIONS: Record<string, Permission[]> = {
+  SUPER_ADMIN: ['*'],
+  RESTAURANT_OWNER: ['read', 'write', 'delete'],
+  MANAGER: ['read', 'write'],
+  WAITER: ['read'],
+  KITCHEN: ['read'],
+};
 
 export const ROLES_KEY = 'roles';
 export const PERMISSIONS_KEY = 'permissions';
@@ -34,31 +42,23 @@ export class RolesGuard implements CanActivate {
       context.getClass(),
     ]);
 
-    if (!requiredRoles && !requiredPermissions) {
-      return true; // No restrictions
-    }
+    if (!requiredRoles && !requiredPermissions) return true;
 
     const { user } = context.switchToHttp().getRequest();
+    if (!user) throw new ForbiddenException('Authentication required');
 
-    if (!user) {
-      throw new ForbiddenException('Authentication required');
-    }
-
-    // Check role
     if (requiredRoles && !requiredRoles.includes(user.role)) {
       throw new ForbiddenException('Insufficient role privileges');
     }
 
-    // Check permissions
     if (requiredPermissions) {
       const userPermissions = ROLE_PERMISSIONS[user.role] || [];
       const customPermissions = user.customPermissions || [];
       const allPermissions = [...userPermissions, ...customPermissions];
-
-      const hasAllPermissions = requiredPermissions.every((p) => allPermissions.includes(p));
-      if (!hasAllPermissions) {
-        throw new ForbiddenException('Insufficient permissions');
-      }
+      const hasAllPermissions = requiredPermissions.every((p) =>
+        allPermissions.includes(p) || allPermissions.includes('*')
+      );
+      if (!hasAllPermissions) throw new ForbiddenException('Insufficient permissions');
     }
 
     return true;

@@ -53,20 +53,14 @@ export class CampaignsService {
     bannerText: string;
     isActive: boolean;
   }>) {
-    const campaign = await this.prisma.campaign.findFirst({
-      where: { id, tenantId },
-    });
+    const campaign = await this.prisma.campaign.findFirst({ where: { id, tenantId } });
     if (!campaign) throw new NotFoundException('Campaign not found');
-
     return this.prisma.campaign.update({ where: { id }, data });
   }
 
   async deleteCampaign(tenantId: string, id: string) {
-    const campaign = await this.prisma.campaign.findFirst({
-      where: { id, tenantId },
-    });
+    const campaign = await this.prisma.campaign.findFirst({ where: { id, tenantId } });
     if (!campaign) throw new NotFoundException('Campaign not found');
-
     return this.prisma.campaign.update({
       where: { id },
       data: { isDeleted: true, isActive: false },
@@ -74,6 +68,7 @@ export class CampaignsService {
   }
 
   async validateCoupon(tenantId: string, code: string, orderAmount: number) {
+    const now = new Date();
     const campaign = await this.prisma.campaign.findFirst({
       where: {
         tenantId,
@@ -81,41 +76,32 @@ export class CampaignsService {
         type: CampaignType.COUPON,
         isActive: true,
         isDeleted: false,
-        startDate: { lte: new Date() },
-        OR: [{ endDate: null }, { endDate: { gte: new Date() } }],
-        OR: [{ maxUses: null }, { usedCount: { lt: { maxUses: { path: [] } } } }],
+        startDate: { lte: now },
+        AND: [
+          { OR: [{ endDate: null }, { endDate: { gte: now } }] },
+          { OR: [{ maxUses: null }, { maxUses: { gt: 0 } }] },
+        ],
       },
     });
 
-    if (!campaign) {
-      return { valid: false, message: 'Invalid or expired coupon' };
-    }
+    if (!campaign) return { valid: false, message: 'Invalid or expired coupon' };
 
     if (campaign.minOrderAmount && orderAmount < Number(campaign.minOrderAmount)) {
-      return {
-        valid: false,
-        message: `Minimum order amount is ${campaign.minOrderAmount} EGP`,
-      };
+      return { valid: false, message: `Minimum order amount is ${campaign.minOrderAmount} EGP` };
     }
 
     let discount = 0;
     if (campaign.discountPercent) {
-      discount = (orderAmount * campaign.discountPercent) / 100;
-      if (campaign.maxDiscount) {
-        discount = Math.min(discount, Number(campaign.maxDiscount));
-      }
+      discount = (orderAmount * Number(campaign.discountPercent)) / 100;
+      if (campaign.maxDiscount) discount = Math.min(discount, Number(campaign.maxDiscount));
     } else if (campaign.discountAmount) {
       discount = Number(campaign.discountAmount);
     }
 
-    return {
-      valid: true,
-      discount,
-      campaignId: campaign.id,
-    };
+    return { valid: true, discount, campaignId: campaign.id };
   }
 
-  async applyCoupon(tenantId: string, campaignId: string) {
+  async applyCoupon(_tenantId: string, campaignId: string) {
     await this.prisma.campaign.update({
       where: { id: campaignId },
       data: { usedCount: { increment: 1 } },
