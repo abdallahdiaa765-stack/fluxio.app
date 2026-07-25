@@ -1,5 +1,5 @@
 import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
-import { PrismaClient } from '@fluxio/database';
+import { PrismaClient } from '../../packages/database/src/generated/prisma';
 
 @Injectable()
 export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
@@ -27,7 +27,6 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
     const previousTenant = this.currentTenantId;
     this.currentTenantId = tenantId;
 
-    // Set PostgreSQL RLS context
     await this.$executeRawUnsafe(
       `SELECT set_config('app.current_tenant', '${tenantId}', false)`
     );
