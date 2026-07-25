@@ -1,49 +1,54 @@
-import { Body, Controller, Get, Param, Patch, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, UseGuards, ForbiddenException } from '@nestjs/common';
 import { SuperAdminService } from './super-admin.service';
 import { JwtAuthGuard } from '@/auth/guards/jwt-auth.guard';
-import { RolesGuard, Roles } from '@/auth/guards/roles.guard';
+import { RolesGuard } from '@/auth/guards/roles.guard';
 import { UpdateBrandingDto } from './dto/update-branding.dto';
 import { UpdateStatusDto } from './dto/update-status.dto';
 import { AssignSubscriptionDto } from './dto/assign-subscription.dto';
+import { CurrentUser } from '@/common/decorators/current-user.decorator';
 
-// Every route here is gated behind BOTH a valid JWT and the SUPER_ADMIN role.
-// This is the only place in the API that can see or edit data across
-// tenants - regular tenant users (including RESTAURANT_OWNER) get a 403.
 @Controller('super-admin')
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles('SUPER_ADMIN')
 export class SuperAdminController {
   constructor(private superAdminService: SuperAdminService) {}
 
+  private checkSuperAdmin(user: any) {
+    if (user?.role !== 'SUPER_ADMIN') throw new ForbiddenException('Super admin access required');
+  }
+
   @Get('overview')
-  getOverview() {
+  getOverview(@CurrentUser() user: any) {
+    this.checkSuperAdmin(user);
     return this.superAdminService.getOverview();
   }
 
   @Get('tenants')
-  listTenants() {
+  listTenants(@CurrentUser() user: any) {
+    this.checkSuperAdmin(user);
     return this.superAdminService.listTenants();
   }
 
   @Get('tenants/:id')
-  getTenant(@Param('id') id: string) {
+  getTenant(@CurrentUser() user: any, @Param('id') id: string) {
+    this.checkSuperAdmin(user);
     return this.superAdminService.getTenant(id);
   }
 
   @Patch('tenants/:id/branding')
-  updateBranding(@Param('id') id: string, @Body() dto: UpdateBrandingDto) {
+  updateBranding(@CurrentUser() user: any, @Param('id') id: string, @Body() dto: UpdateBrandingDto) {
+    this.checkSuperAdmin(user);
     return this.superAdminService.updateBranding(id, dto);
   }
 
   @Patch('tenants/:id/status')
-  updateStatus(@Param('id') id: string, @Body() dto: UpdateStatusDto) {
+  updateStatus(@CurrentUser() user: any, @Param('id') id: string, @Body() dto: UpdateStatusDto) {
+    this.checkSuperAdmin(user);
     return this.superAdminService.updateStatus(id, dto.isActive);
   }
 
-  // Activates/changes a tenant's package "from the super admin's side" -
-  // e.g. after manually confirming a Vodafone Cash payment arrived.
   @Patch('tenants/:id/subscription')
-  assignSubscription(@Param('id') id: string, @Body() dto: AssignSubscriptionDto) {
+  assignSubscription(@CurrentUser() user: any, @Param('id') id: string, @Body() dto: AssignSubscriptionDto) {
+    this.checkSuperAdmin(user);
     return this.superAdminService.assignSubscription(id, dto);
   }
 }

@@ -1,13 +1,6 @@
 import {
-  Controller,
-  Get,
-  Post,
-  Put,
-  Delete,
-  Body,
-  Param,
-  Query,
-  UseGuards,
+  Controller, Get, Post, Put, Delete,
+  Body, Param, Query, UseGuards,
 } from '@nestjs/common';
 import { CampaignsService } from './campaigns.service';
 import { JwtAuthGuard } from '@/auth/guards/jwt-auth.guard';
@@ -17,15 +10,15 @@ import { CurrentTenant } from '@/common/decorators/current-user.decorator';
 import { CampaignType } from '@fluxio/database';
 
 class CreateCampaignDto {
-  name: string;
-  type: CampaignType;
+  name!: string;
+  type!: CampaignType;
   discountPercent?: number;
   discountAmount?: number;
   maxDiscount?: number;
   minOrderAmount?: number;
   applicableCategories?: string[];
   applicableProducts?: string[];
-  startDate: string;
+  startDate!: string;
   endDate?: string;
   maxUses?: number;
   maxUsesPerCustomer?: number;
@@ -40,10 +33,7 @@ export class CampaignsController {
 
   @Get()
   @RequirePermissions(Permission.MENU_VIEW)
-  async getCampaigns(
-    @CurrentTenant() tenantId: string,
-    @Query('type') type?: CampaignType,
-  ) {
+  async getCampaigns(@CurrentTenant() tenantId: string, @Query('type') type?: CampaignType) {
     return this.campaignsService.getCampaigns(tenantId, { type });
   }
 
@@ -64,7 +54,11 @@ export class CampaignsController {
     @Param('id') id: string,
     @Body() dto: Partial<CreateCampaignDto>,
   ) {
-    return this.campaignsService.updateCampaign(tenantId, id, dto);
+    return this.campaignsService.updateCampaign(tenantId, id, {
+      ...dto,
+      ...(dto.startDate && { startDate: new Date(dto.startDate) }),
+      ...(dto.endDate && { endDate: new Date(dto.endDate) }),
+    });
   }
 
   @Delete(':id')
