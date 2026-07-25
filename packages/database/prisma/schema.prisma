@@ -623,7 +623,7 @@ model Reservation {
 
   tenant      Tenant   @relation(fields: [tenantId], references: [id])
   table       Table?   @relation(fields: [tableId], references: [id])
-  customer    User?    @relation("CustomerOrders", fields: [customerId], references: [id])
+  customer    User?    @relation("ReservationCustomer", fields: [customerId], references: [id])
 
   @@index([tenantId])
   @@index([date])
