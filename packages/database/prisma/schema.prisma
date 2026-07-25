@@ -126,7 +126,7 @@ model Tenant {
   updatedAt   DateTime @updatedAt
 
   // Subscription
-  subscription   Subscription?
+  subscription   Subscription? @relation("TenantSubscription")
 
   // Relations
   branches     Branch[]
@@ -187,7 +187,7 @@ model Subscription {
   updatedAt   DateTime @updatedAt
 
   // Relations
-  tenant      Tenant?
+  tenant      Tenant?  @relation("TenantSubscription", fields: [tenantId], references: [id])
   invoices    Invoice[]
   coupons     SubscriptionCoupon[]
 
@@ -267,7 +267,7 @@ model User {
   tenant      Tenant   @relation(fields: [tenantId], references: [id])
   sessions    Session[]
   orders      Order[]     @relation("CreatedBy")
-  reservations Reservation[]
+  reservations Reservation[] @relation("ReservationCustomer")
   reviews     Review[]
   auditLogs   AuditLog[]
 
