@@ -1,5 +1,5 @@
 import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from '@fluxio/database';
 
 @Injectable()
 export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
@@ -26,11 +26,9 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
   async withTenant<T>(tenantId: string, operation: () => Promise<T>): Promise<T> {
     const previousTenant = this.currentTenantId;
     this.currentTenantId = tenantId;
-
     await this.$executeRawUnsafe(
       `SELECT set_config('app.current_tenant', '${tenantId}', false)`
     );
-
     try {
       return await operation();
     } finally {
