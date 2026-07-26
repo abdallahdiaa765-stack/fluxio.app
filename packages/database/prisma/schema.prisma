@@ -902,5 +902,6 @@ model QrCode {
   @@index([tenantId])
   @@index([code])
 }
-#   t r i g g e r   r e b u i l d  
+#   t r i g g e r   r e b u i l d 
+ 
  
