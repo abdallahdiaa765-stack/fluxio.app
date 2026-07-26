@@ -3,7 +3,7 @@
 
 generator client {
   provider = "prisma-client-js"
-  output   = "../src/generated/prisma"
+  
 }
 
 datasource db {
@@ -109,39 +109,39 @@ enum NotificationChannel {
 // ============================================
 
 model Tenant {
-  id             String   @id @default(cuid())
-  name           String
-  slug           String   @unique
-  email          String
-  phone          String?
-  address        String?
-  logoUrl        String?
-  faviconUrl     String?
-  primaryColor   String?  @default("#00d4ff")
-  secondaryColor String?  @default("#7b2ff7")
-  accentColor    String?  @default("#00f5d4")
-  isActive       Boolean  @default(true)
-  isDeleted      Boolean  @default(false)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  email       String
+  phone       String?
+  address     String?
+  logoUrl     String?
+  faviconUrl  String?
+  primaryColor String? @default("#00d4ff")
+  secondaryColor String? @default("#7b2ff7")
+  accentColor String? @default("#00f5d4")
+  isActive    Boolean  @default(true)
+  isDeleted   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   // Subscription
-  subscription   Subscription?      @relation(fields: [subscriptionId], references: [id])
-  subscriptionId String?            @unique
+  subscription   Subscription? @relation("TenantSubscription")
+
   // Relations
-  branches       Branch[]
-  users          User[]
-  categories     Category[]
-  products       Product[]
-  orders         Order[]
-  tables         Table[]
-  reservations   Reservation[]
+  branches     Branch[]
+  users        User[]
+  categories   Category[]
+  products     Product[]
+  orders       Order[]
+  tables       Table[]
+  reservations Reservation[]
   inventoryItems InventoryItem[]
-  suppliers      Supplier[]
-  campaigns      Campaign[]
-  reviews        Review[]
-  auditLogs      AuditLog[]
-  settings       RestaurantSetting?
+  suppliers    Supplier[]
+  campaigns    Campaign[]
+  reviews      Review[]
+  auditLogs    AuditLog[]
+  settings     RestaurantSetting?
 
   @@index([slug])
   @@index([isActive])
@@ -149,27 +149,27 @@ model Tenant {
 }
 
 model Subscription {
-  id       String             @id @default(cuid())
-  tenantId String             @unique
-  plan     SubscriptionPlan   @default(STARTER)
-  status   SubscriptionStatus @default(TRIAL)
+  id          String   @id @default(cuid())
+  tenantId    String   @unique
+  plan        SubscriptionPlan @default(STARTER)
+  status      SubscriptionStatus @default(TRIAL)
 
   // Plan Limits
-  maxBranches  Int  @default(1)
-  maxEmployees Int  @default(10)
-  maxProducts  Int? // null = unlimited
-  maxOrders    Int? // null = unlimited
+  maxBranches Int      @default(1)
+  maxEmployees Int    @default(10)
+  maxProducts Int?     // null = unlimited
+  maxOrders   Int?     // null = unlimited
 
   // Billing
-  priceMonthly Decimal @default(999.00)
-  priceYearly  Decimal @default(9990.00)
-  currency     String  @default("EGP")
+  priceMonthly   Decimal  @default(999.00)
+  priceYearly    Decimal  @default(9990.00)
+  currency       String   @default("EGP")
 
   // Dates
-  trialEndsAt        DateTime?
-  currentPeriodStart DateTime  @default(now())
+  trialEndsAt    DateTime?
+  currentPeriodStart DateTime @default(now())
   currentPeriodEnd   DateTime?
-  cancelledAt        DateTime?
+  cancelledAt    DateTime?
 
   // Lifecycle tracking - written only by SubscriptionsCronService / super-admin
   // assignment, so the daily job never sends the same "expiring soon" warning
@@ -182,14 +182,14 @@ model Subscription {
   stripeSubscriptionId String?
   stripePriceId        String?
 
-  isDeleted Boolean  @default(false)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  isDeleted   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   // Relations
-  tenant   Tenant?
-  invoices Invoice[]
-  coupons  SubscriptionCoupon[]
+  tenant      Tenant?  @relation("TenantSubscription", fields: [tenantId], references: [id])
+  invoices    Invoice[]
+  coupons     SubscriptionCoupon[]
 
   @@index([tenantId])
   @@index([status])
@@ -197,39 +197,39 @@ model Subscription {
 }
 
 model Invoice {
-  id              String    @id @default(cuid())
+  id              String   @id @default(cuid())
   subscriptionId  String
   amount          Decimal
-  currency        String    @default("EGP")
-  status          String // paid, pending, failed
-  paymentMethod   String    @default("stripe") // stripe, vodafone_cash
-  reference       String? // e.g. the number/txn note the owner paid from, for manual methods
+  currency        String   @default("EGP")
+  status          String   // paid, pending, failed
+  paymentMethod   String   @default("stripe") // stripe, vodafone_cash
+  reference       String?  // e.g. the number/txn note the owner paid from, for manual methods
   stripeInvoiceId String?
   paidAt          DateTime?
   dueDate         DateTime?
   pdfUrl          String?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
-  subscription Subscription @relation(fields: [subscriptionId], references: [id])
+  subscription    Subscription @relation(fields: [subscriptionId], references: [id])
 
   @@index([subscriptionId])
 }
 
 model SubscriptionCoupon {
-  id              String    @id @default(cuid())
+  id              String   @id @default(cuid())
   subscriptionId  String
   code            String
-  discountPercent Int? // e.g., 20 for 20%
+  discountPercent Int?     // e.g., 20 for 20%
   discountAmount  Decimal? // fixed amount
-  validFrom       DateTime  @default(now())
+  validFrom       DateTime @default(now())
   validUntil      DateTime?
   maxUses         Int?
-  usedCount       Int       @default(0)
-  isActive        Boolean   @default(true)
-  createdAt       DateTime  @default(now())
+  usedCount       Int      @default(0)
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
 
-  subscription Subscription @relation(fields: [subscriptionId], references: [id])
+  subscription    Subscription @relation(fields: [subscriptionId], references: [id])
 
   @@index([subscriptionId])
   @@index([code])
@@ -240,40 +240,40 @@ model SubscriptionCoupon {
 // ============================================
 
 model User {
-  id        String   @id @default(cuid())
-  tenantId  String
-  email     String
-  username  String   @unique
-  password  String // hashed with bcrypt
-  firstName String?
-  lastName  String?
-  phone     String?
-  avatarUrl String?
-  role      UserRole @default(CUSTOMER)
+  id          String   @id @default(cuid())
+  tenantId    String
+  email       String
+  username    String   @unique
+  password    String   // hashed with bcrypt
+  firstName   String?
+  lastName    String?
+  phone       String?
+  avatarUrl   String?
+  role        UserRole @default(CUSTOMER)
 
   // For customers
-  isVerified Boolean @default(false)
+  isVerified  Boolean  @default(false)
 
   // Custom permissions override (JSON array of permission strings)
   customPermissions Json?
 
-  isActive    Boolean   @default(true)
-  isDeleted   Boolean   @default(false)
+  isActive    Boolean  @default(true)
+  isDeleted   Boolean  @default(false)
   lastLoginAt DateTime?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   // Relations
-  tenant         Tenant        @relation(fields: [tenantId], references: [id])
-  sessions       Session[]
-  orders         Order[]       @relation("CreatedBy")
-  customerOrders Order[]       @relation("CustomerOrders")
-  reservations   Reservation[]
-  reviews        Review[]
-  auditLogs      AuditLog[]
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  sessions    Session[]
+  orders      Order[]     @relation("CreatedBy")
+  reservations Reservation[] @relation("ReservationCustomer")
+  reviews     Review[]
+  auditLogs   AuditLog[]
 
   // Waiter specific
   waiterAssignments Order[] @relation("AssignedWaiter")
+  customerOrders    Order[] @relation("CustomerOrders")
 
   @@unique([tenantId, email])
   @@index([tenantId])
@@ -283,17 +283,17 @@ model User {
 }
 
 model Session {
-  id               String   @id @default(cuid())
-  userId           String
-  token            String   @unique
-  refreshToken     String   @unique
-  ipAddress        String?
-  userAgent        String?
-  expiresAt        DateTime
+  id          String   @id @default(cuid())
+  userId      String
+  token       String   @unique
+  refreshToken String  @unique
+  ipAddress   String?
+  userAgent   String?
+  expiresAt   DateTime
   refreshExpiresAt DateTime
-  createdAt        DateTime @default(now())
+  createdAt   DateTime @default(now())
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([token])
@@ -305,28 +305,28 @@ model Session {
 // ============================================
 
 model Branch {
-  id       String  @id @default(cuid())
-  tenantId String
-  name     String
-  address  String?
-  phone    String?
-  email    String?
+  id          String   @id @default(cuid())
+  tenantId    String
+  name        String
+  address     String?
+  phone       String?
+  email       String?
 
   // Business Hours (JSON: {monday: {open: "09:00", close: "23:00", closed: false}, ...})
   businessHours Json?
 
   // Location
-  latitude  Decimal?
-  longitude Decimal?
+  latitude    Decimal?
+  longitude   Decimal?
 
-  isActive  Boolean  @default(true)
-  isDeleted Boolean  @default(false)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  isActive    Boolean  @default(true)
+  isDeleted   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  tenant         Tenant          @relation(fields: [tenantId], references: [id])
-  tables         Table[]
-  orders         Order[]
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  tables      Table[]
+  orders      Order[]
   inventoryItems InventoryItem[]
 
   @@index([tenantId])
@@ -334,33 +334,33 @@ model Branch {
 }
 
 model RestaurantSetting {
-  id       String @id @default(cuid())
-  tenantId String @unique
+  id              String   @id @default(cuid())
+  tenantId        String   @unique
 
   // Branding
-  brandName    String?
-  brandLogoUrl String?
-  brandColors  Json? // {primary: "#00d4ff", secondary: "#7b2ff7", ...}
+  brandName       String?
+  brandLogoUrl    String?
+  brandColors     Json?    // {primary: "#00d4ff", secondary: "#7b2ff7", ...}
 
   // Business
-  taxRate   Decimal @default(14.00) // Egypt default VAT
-  taxNumber String?
-  currency  String  @default("EGP")
+  taxRate         Decimal  @default(14.00) // Egypt default VAT
+  taxNumber       String?
+  currency        String   @default("EGP")
 
   // Features
-  enableTips         Boolean @default(true)
-  enableDelivery     Boolean @default(false)
+  enableTips      Boolean  @default(true)
+  enableDelivery  Boolean  @default(false)
   enableReservations Boolean @default(true)
 
   // Receipt
-  receiptHeader  String?
-  receiptFooter  String?
-  receiptShowTax Boolean @default(true)
+  receiptHeader   String?
+  receiptFooter   String?
+  receiptShowTax  Boolean  @default(true)
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
-  tenant Tenant @relation(fields: [tenantId], references: [id])
+  tenant          Tenant   @relation(fields: [tenantId], references: [id])
 }
 
 // ============================================
@@ -371,7 +371,7 @@ model Category {
   id          String   @id @default(cuid())
   tenantId    String
   name        String
-  nameAr      String? // Arabic name
+  nameAr      String?  // Arabic name
   description String?
   imageUrl    String?
   sortOrder   Int      @default(0)
@@ -380,8 +380,8 @@ model Category {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  tenant   Tenant    @relation(fields: [tenantId], references: [id])
-  products Product[]
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  products    Product[]
 
   @@index([tenantId])
   @@index([isActive])
@@ -400,25 +400,25 @@ model Product {
   sku         String?
 
   // Flags
-  isAvailable Boolean @default(true)
-  isFeatured  Boolean @default(false)
-  isDeleted   Boolean @default(false)
+  isAvailable Boolean  @default(true)
+  isFeatured  Boolean  @default(false)
+  isDeleted   Boolean  @default(false)
 
   // Inventory link
   inventoryItemId String?
 
   // Track stock if linked to inventory
-  trackStock Boolean @default(false)
+  trackStock  Boolean  @default(false)
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  tenant        Tenant           @relation(fields: [tenantId], references: [id])
-  category      Category?        @relation(fields: [categoryId], references: [id])
-  variants      ProductVariant[]
-  extras        ProductExtra[]
-  orderItems    OrderItem[]
-  inventoryItem InventoryItem?   @relation(fields: [inventoryItemId], references: [id])
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  category    Category? @relation(fields: [categoryId], references: [id])
+  variants    ProductVariant[]
+  extras      ProductExtra[]
+  orderItems  OrderItem[]
+  inventoryItem InventoryItem? @relation(fields: [inventoryItemId], references: [id])
 
   @@index([tenantId])
   @@index([categoryId])
@@ -426,29 +426,29 @@ model Product {
 }
 
 model ProductVariant {
-  id              String   @id @default(cuid())
-  productId       String
-  name            String // e.g., "Large", "Medium"
-  nameAr          String?
-  priceAdjustment Decimal  @default(0)
-  isActive        Boolean  @default(true)
-  createdAt       DateTime @default(now())
+  id          String   @id @default(cuid())
+  productId   String
+  name        String   // e.g., "Large", "Medium"
+  nameAr      String?
+  priceAdjustment Decimal @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
 
-  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   @@index([productId])
 }
 
 model ProductExtra {
-  id        String   @id @default(cuid())
-  productId String
-  name      String // e.g., "Extra Cheese", "Spicy"
-  nameAr    String?
-  price     Decimal
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
+  id          String   @id @default(cuid())
+  productId   String
+  name        String   // e.g., "Extra Cheese", "Spicy"
+  nameAr      String?
+  price       Decimal
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
 
-  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   @@index([productId])
 }
@@ -458,59 +458,59 @@ model ProductExtra {
 // ============================================
 
 model Order {
-  id       String  @id @default(cuid())
-  tenantId String
-  branchId String?
+  id          String   @id @default(cuid())
+  tenantId    String
+  branchId    String?
 
   // Order Info
-  orderNumber String      @unique // e.g., "ORD-000001"
-  type        OrderType   @default(DINE_IN)
+  orderNumber String   @unique // e.g., "ORD-000001"
+  type        OrderType @default(DINE_IN)
   status      OrderStatus @default(PENDING)
 
   // Customer
-  customerId    String?
-  customerName  String?
+  customerId  String?
+  customerName String?
   customerPhone String?
   customerEmail String?
 
   // Table (for dine-in)
-  tableId String?
+  tableId     String?
 
   // Waiter
   waiterId    String?
   createdById String
 
   // Financial
-  subtotal       Decimal @default(0)
-  taxAmount      Decimal @default(0)
+  subtotal    Decimal  @default(0)
+  taxAmount   Decimal  @default(0)
   discountAmount Decimal @default(0)
-  totalAmount    Decimal @default(0)
+  totalAmount Decimal  @default(0)
 
   // Notes
   customerNote String?
   internalNote String?
 
   // Timestamps
-  confirmedAt  DateTime?
-  preparingAt  DateTime?
-  readyAt      DateTime?
-  deliveredAt  DateTime?
-  cancelledAt  DateTime?
-  cancelledBy  String?
+  confirmedAt DateTime?
+  preparingAt DateTime?
+  readyAt     DateTime?
+  deliveredAt DateTime?
+  cancelledAt DateTime?
+  cancelledBy String?
   cancelReason String?
 
-  isDeleted Boolean  @default(false)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  isDeleted   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  tenant    Tenant      @relation(fields: [tenantId], references: [id])
-  branch    Branch?     @relation(fields: [branchId], references: [id])
-  customer  User?       @relation("CustomerOrders", fields: [customerId], references: [id])
-  table     Table?      @relation(fields: [tableId], references: [id])
-  waiter    User?       @relation("AssignedWaiter", fields: [waiterId], references: [id])
-  createdBy User        @relation("CreatedBy", fields: [createdById], references: [id])
-  items     OrderItem[]
-  payments  Payment[]
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  branch      Branch?  @relation(fields: [branchId], references: [id])
+  customer    User?    @relation("CustomerOrders", fields: [customerId], references: [id])
+  table       Table?   @relation(fields: [tableId], references: [id])
+  waiter      User?    @relation("AssignedWaiter", fields: [waiterId], references: [id])
+  createdBy   User     @relation("CreatedBy", fields: [createdById], references: [id])
+  items       OrderItem[]
+  payments    Payment[]
 
   @@index([tenantId])
   @@index([status])
@@ -519,24 +519,24 @@ model Order {
 }
 
 model OrderItem {
-  id        String  @id @default(cuid())
-  orderId   String
-  productId String
-  variantId String?
+  id          String   @id @default(cuid())
+  orderId     String
+  productId   String
+  variantId   String?
 
-  name       String // snapshot at order time
-  quantity   Int     @default(1)
-  unitPrice  Decimal
-  totalPrice Decimal
+  name        String   // snapshot at order time
+  quantity    Int      @default(1)
+  unitPrice   Decimal
+  totalPrice  Decimal
 
   // Extras (JSON array of {name, price})
-  extras Json?
+  extras      Json?
 
-  notes     String?
-  createdAt DateTime @default(now())
+  notes       String?
+  createdAt   DateTime @default(now())
 
-  order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  product Product @relation(fields: [productId], references: [id])
+  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product     Product  @relation(fields: [productId], references: [id])
 
   @@index([orderId])
   @@index([productId])
@@ -547,24 +547,24 @@ model OrderItem {
 // ============================================
 
 model Payment {
-  id        String        @id @default(cuid())
-  orderId   String
-  method    PaymentMethod
-  status    PaymentStatus @default(PENDING)
-  amount    Decimal
-  tipAmount Decimal       @default(0)
+  id          String   @id @default(cuid())
+  orderId     String
+  method      PaymentMethod
+  status      PaymentStatus @default(PENDING)
+  amount      Decimal
+  tipAmount   Decimal  @default(0)
 
   // Split payment
-  isSplit    Boolean @default(false)
-  splitIndex Int? // 1, 2, 3 for split payments
+  isSplit     Boolean  @default(false)
+  splitIndex  Int?     // 1, 2, 3 for split payments
 
   // Reference
-  reference String? // transaction ID from gateway
+  reference   String?  // transaction ID from gateway
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
   @@index([orderId])
   @@index([status])
@@ -575,26 +575,26 @@ model Payment {
 // ============================================
 
 model Table {
-  id       String  @id @default(cuid())
-  tenantId String
-  branchId String?
-  number   String // e.g., "T01", "A-5"
-  capacity Int     @default(4)
+  id          String   @id @default(cuid())
+  tenantId    String
+  branchId    String?
+  number      String   // e.g., "T01", "A-5"
+  capacity    Int      @default(4)
 
   // Layout position (for visual floor plan)
-  posX  Int    @default(0)
-  posY  Int    @default(0)
-  shape String @default("rectangle") // rectangle, circle, square
+  posX        Int      @default(0)
+  posY        Int      @default(0)
+  shape       String   @default("rectangle") // rectangle, circle, square
 
-  status    String   @default("available") // available, occupied, reserved, cleaning
-  isActive  Boolean  @default(true)
-  isDeleted Boolean  @default(false)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  status      String   @default("available") // available, occupied, reserved, cleaning
+  isActive    Boolean  @default(true)
+  isDeleted   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  tenant       Tenant        @relation(fields: [tenantId], references: [id])
-  branch       Branch?       @relation(fields: [branchId], references: [id])
-  orders       Order[]
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  branch      Branch?  @relation(fields: [branchId], references: [id])
+  orders      Order[]
   reservations Reservation[]
 
   @@unique([tenantId, number])
@@ -603,27 +603,27 @@ model Table {
 }
 
 model Reservation {
-  id         String  @id @default(cuid())
-  tenantId   String
-  tableId    String?
-  customerId String?
+  id          String   @id @default(cuid())
+  tenantId    String
+  tableId     String?
+  customerId  String?
 
   customerName  String
   customerPhone String
   customerEmail String?
-  partySize     Int
+  partySize   Int
 
-  date   DateTime
-  time   String // "19:30"
-  status ReservationStatus @default(PENDING)
-  notes  String?
+  date        DateTime
+  time        String   // "19:30"
+  status      ReservationStatus @default(PENDING)
+  notes       String?
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  tenant   Tenant @relation(fields: [tenantId], references: [id])
-  table    Table? @relation(fields: [tableId], references: [id])
-  customer User?  @relation(fields: [customerId], references: [id])
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  table       Table?   @relation(fields: [tableId], references: [id])
+  customer    User?    @relation("ReservationCustomer", fields: [customerId], references: [id])
 
   @@index([tenantId])
   @@index([date])
@@ -635,9 +635,9 @@ model Reservation {
 // ============================================
 
 model InventoryItem {
-  id       String  @id @default(cuid())
-  tenantId String
-  branchId String?
+  id          String   @id @default(cuid())
+  tenantId    String
+  branchId    String?
 
   name        String
   nameAr      String?
@@ -648,27 +648,27 @@ model InventoryItem {
   unitOfMeasure String @default("piece") // kg, liter, piece, box, etc.
 
   // Stock
-  currentStock  Decimal  @default(0)
-  minStockLevel Decimal  @default(0)
+  currentStock Decimal @default(0)
+  minStockLevel Decimal @default(0)
   maxStockLevel Decimal?
   reorderPoint  Decimal?
 
   // Cost
-  unitCost Decimal?
+  unitCost    Decimal?
 
   // Supplier
-  supplierId String?
+  supplierId  String?
 
-  isActive  Boolean  @default(true)
-  isDeleted Boolean  @default(false)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  isActive    Boolean  @default(true)
+  isDeleted   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  tenant    Tenant              @relation(fields: [tenantId], references: [id])
-  branch    Branch?             @relation(fields: [branchId], references: [id])
-  supplier  Supplier?           @relation(fields: [supplierId], references: [id])
-  products  Product[]
-  movements InventoryMovement[]
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  branch      Branch?  @relation(fields: [branchId], references: [id])
+  supplier    Supplier? @relation(fields: [supplierId], references: [id])
+  products    Product[]
+  movements   InventoryMovement[]
 
   @@index([tenantId])
   @@index([supplierId])
@@ -676,22 +676,22 @@ model InventoryItem {
 }
 
 model InventoryMovement {
-  id        String                @id @default(cuid())
-  itemId    String
-  type      InventoryMovementType
-  quantity  Decimal
-  unitCost  Decimal?
-  totalCost Decimal?
+  id          String   @id @default(cuid())
+  itemId      String
+  type        InventoryMovementType
+  quantity    Decimal
+  unitCost    Decimal?
+  totalCost   Decimal?
 
   // Reference
-  orderId   String? // if linked to sale
-  reference String? // PO number, adjustment reason, etc.
-  notes     String?
+  orderId     String?  // if linked to sale
+  reference   String?  // PO number, adjustment reason, etc.
+  notes       String?
 
-  createdBy String // userId
-  createdAt DateTime @default(now())
+  createdBy   String   // userId
+  createdAt   DateTime @default(now())
 
-  item InventoryItem @relation(fields: [itemId], references: [id])
+  item        InventoryItem @relation(fields: [itemId], references: [id])
 
   @@index([itemId])
   @@index([createdAt])
@@ -710,8 +710,8 @@ model Supplier {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  tenant Tenant          @relation(fields: [tenantId], references: [id])
-  items  InventoryItem[]
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  items       InventoryItem[]
 
   @@index([tenantId])
 }
@@ -721,10 +721,10 @@ model Supplier {
 // ============================================
 
 model Campaign {
-  id       String       @id @default(cuid())
-  tenantId String
-  name     String
-  type     CampaignType
+  id          String   @id @default(cuid())
+  tenantId    String
+  name        String
+  type        CampaignType
 
   // Discount
   discountPercent Int?
@@ -732,28 +732,28 @@ model Campaign {
   maxDiscount     Decimal?
 
   // Conditions
-  minOrderAmount       Decimal?
+  minOrderAmount  Decimal?
   applicableCategories String[] // category IDs
   applicableProducts   String[] // product IDs
 
   // Schedule
-  startDate DateTime
-  endDate   DateTime?
+  startDate   DateTime
+  endDate     DateTime?
 
   // Usage
-  maxUses            Int?
-  usedCount          Int  @default(0)
+  maxUses     Int?
+  usedCount   Int      @default(0)
   maxUsesPerCustomer Int? @default(1)
 
   // Display
-  bannerUrl  String?
-  bannerText String?
-  isActive   Boolean  @default(true)
-  isDeleted  Boolean  @default(false)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  bannerUrl   String?
+  bannerText  String?
+  isActive    Boolean  @default(true)
+  isDeleted   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  tenant Tenant @relation(fields: [tenantId], references: [id])
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
 
   @@index([tenantId])
   @@index([type])
@@ -761,15 +761,15 @@ model Campaign {
 }
 
 model LoyaltyProgram {
-  id             String @id @default(cuid())
-  tenantId       String
-  customerId     String
-  points         Int    @default(0)
-  lifetimePoints Int    @default(0)
-  tier           String @default("bronze") // bronze, silver, gold, platinum
+  id          String   @id @default(cuid())
+  tenantId    String
+  customerId  String
+  points      Int      @default(0)
+  lifetimePoints Int   @default(0)
+  tier        String   @default("bronze") // bronze, silver, gold, platinum
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   @@unique([tenantId, customerId])
   @@index([tenantId])
@@ -778,8 +778,8 @@ model LoyaltyProgram {
 model LoyaltyTransaction {
   id          String   @id @default(cuid())
   programId   String
-  points      Int // positive = earned, negative = redeemed
-  type        String // earn, redeem, expire, bonus
+  points      Int      // positive = earned, negative = redeemed
+  type        String   // earn, redeem, expire, bonus
   orderId     String?
   description String?
   createdAt   DateTime @default(now())
@@ -792,25 +792,25 @@ model LoyaltyTransaction {
 // ============================================
 
 model Review {
-  id         String  @id @default(cuid())
-  tenantId   String
-  customerId String
-  orderId    String?
+  id          String   @id @default(cuid())
+  tenantId    String
+  customerId  String
+  orderId     String?
 
-  rating  Int // 1-5
-  comment String?
+  rating      Int      // 1-5
+  comment     String?
 
   // Moderation
-  isVisible   Boolean   @default(false)
+  isVisible   Boolean  @default(false)
   moderatedBy String?
   moderatedAt DateTime?
 
-  isDeleted Boolean  @default(false)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  isDeleted   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  tenant   Tenant @relation(fields: [tenantId], references: [id])
-  customer User   @relation(fields: [customerId], references: [id])
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  customer    User     @relation(fields: [customerId], references: [id])
 
   @@index([tenantId])
   @@index([rating])
@@ -821,29 +821,29 @@ model Review {
 // ============================================
 
 model AuditLog {
-  id       String  @id @default(cuid())
-  tenantId String
-  userId   String?
+  id          String   @id @default(cuid())
+  tenantId    String
+  userId      String?
 
-  action     String // e.g., "order.created", "user.login", "payment.refunded"
-  entityType String // "Order", "User", "Payment", etc.
-  entityId   String?
+  action      String   // e.g., "order.created", "user.login", "payment.refunded"
+  entityType  String   // "Order", "User", "Payment", etc.
+  entityId    String?
 
   // Before/After snapshots
-  before Json?
-  after  Json?
+  before      Json?
+  after       Json?
 
   // Context
-  ipAddress String?
-  userAgent String?
+  ipAddress   String?
+  userAgent   String?
 
   // For Super Admin impersonation
   impersonatedBy String?
 
-  createdAt DateTime @default(now())
+  createdAt   DateTime @default(now())
 
-  tenant Tenant @relation(fields: [tenantId], references: [id])
-  user   User?  @relation(fields: [userId], references: [id])
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  user        User?    @relation(fields: [userId], references: [id])
 
   @@index([tenantId])
   @@index([action])
@@ -856,23 +856,23 @@ model AuditLog {
 // ============================================
 
 model Notification {
-  id       String  @id @default(cuid())
-  tenantId String?
-  userId   String?
+  id          String   @id @default(cuid())
+  tenantId    String?
+  userId      String?
 
-  title   String
-  body    String
-  channel NotificationChannel @default(PUSH)
+  title       String
+  body        String
+  channel     NotificationChannel @default(PUSH)
 
   // Data
-  data Json? // {orderId, type, etc.}
+  data        Json?    // {orderId, type, etc.}
 
   // Status
-  isRead Boolean   @default(false)
-  sentAt DateTime?
-  readAt DateTime?
+  isRead      Boolean  @default(false)
+  sentAt      DateTime?
+  readAt      DateTime?
 
-  createdAt DateTime @default(now())
+  createdAt   DateTime @default(now())
 
   @@index([tenantId])
   @@index([userId])
@@ -884,21 +884,23 @@ model Notification {
 // ============================================
 
 model QrCode {
-  id       String  @id @default(cuid())
-  tenantId String
-  branchId String?
-  tableId  String?
+  id          String   @id @default(cuid())
+  tenantId    String
+  branchId    String?
+  tableId     String?
 
-  code String @unique // the actual QR code string/URL
-  url  String // the full URL it redirects to
+  code        String   @unique // the actual QR code string/URL
+  url         String   // the full URL it redirects to
 
-  scanCount     Int       @default(0)
+  scanCount   Int      @default(0)
   lastScannedAt DateTime?
 
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   @@index([tenantId])
   @@index([code])
 }
+#   t r i g g e r   r e b u i l d  
+ 
