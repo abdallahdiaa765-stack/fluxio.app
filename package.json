@@ -22,5 +22,15 @@
   "workspaces": [
     "apps/*",
     "packages/*"
-  ]
+  ],
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "bcrypt",
+      "@prisma/client",
+      "@prisma/engines",
+      "prisma",
+      "esbuild",
+      "sharp"
+    ]
+  }
 }
