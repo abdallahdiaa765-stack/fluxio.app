@@ -902,5 +902,5 @@ model QrCode {
   @@index([tenantId])
   @@index([code])
 }
- 
- 
+
+
